@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { Product, Supplier, StockMovement } from '@/core/domain/entities'
 import { RegisterStockEntryDTO, ManualStockAdjustmentDTO } from '@/core/use-cases'
 import { Button } from '@/presentation/components/ui/button'
@@ -23,6 +23,7 @@ interface StockEntryViewProps {
   onRegisterEntry: (dto: RegisterStockEntryDTO) => Promise<Product>
   onManualAdjustment: (dto: ManualStockAdjustmentDTO) => Promise<Product>
   onRefresh?: () => void
+  initialProductId?: string | null
 }
 
 export function StockEntryView({
@@ -32,6 +33,7 @@ export function StockEntryView({
   onRegisterEntry,
   onManualAdjustment,
   onRefresh,
+  initialProductId,
 }: StockEntryViewProps) {
   const [mode, setMode] = useState<'entry' | 'adjustment'>('entry')
 
@@ -39,6 +41,18 @@ export function StockEntryView({
   const [productQuery, setProductQuery] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+
+  useEffect(() => {
+    if (initialProductId) {
+      const prod = products.find((p) => p.id === initialProductId)
+      if (prod) {
+        setSelectedProduct(prod)
+        setProductQuery(prod.name)
+        setNewCost(prod.cost.toString())
+        setTimeout(() => quantityInputRef.current?.focus(), 50)
+      }
+    }
+  }, [initialProductId, products])
 
   // Entry Form state
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')

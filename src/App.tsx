@@ -4,7 +4,8 @@ import { CatalogView } from '@/presentation/views/catalog'
 import { SuppliersView } from '@/presentation/views/suppliers/suppliers-view'
 import { StockEntryView } from '@/presentation/views/stock-entry/stock-entry-view'
 import { PosView, ReceiptDialog } from '@/presentation/views/pos'
-import { Package, ShoppingCart, Layers, TrendingUp, AlertTriangle, CheckCircle2, Truck } from 'lucide-react'
+import { DashboardView } from '@/presentation/views/dashboard'
+import { Package, ShoppingCart, Layers, Truck, LayoutDashboard } from 'lucide-react'
 import { Product, Supplier, StockMovement, Receipt, ReceiptItem } from '@/core/domain/entities'
 import {
   CreateProductDTO,
@@ -105,11 +106,12 @@ const initialMovements: StockMovement[] = [
 ]
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'pos' | 'stock' | 'entries' | 'suppliers' | 'reports'>('pos')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'entries' | 'stock' | 'suppliers'>('dashboard')
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers)
   const [movements, setMovements] = useState<StockMovement[]>(initialMovements)
   const [receipts, setReceipts] = useState<Receipt[]>([])
+  const [selectedProductForEntry, setSelectedProductForEntry] = useState<string | null>(null)
 
   // Printable receipt modal state
   const [currentSaleResult, setCurrentSaleResult] = useState<ProcessSaleResult | null>(null)
@@ -355,6 +357,32 @@ export function App() {
     return result
   }
 
+  const handleViewReceipt = (receipt: Receipt) => {
+    const itemsDetail = receipt.items.map((item) => {
+      const prod = products.find((p) => p.id === item.productId)
+      return {
+        name: prod?.name || 'Artículo',
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotal: item.subtotal,
+      }
+    })
+    const ticketText = ReceiptFormatter.formatThermalTicket({
+      receipt,
+      paymentMethod: 'Efectivo',
+      amountPaid: receipt.totalAmount,
+      change: 0,
+      itemsDetail,
+    })
+    setCurrentSaleResult({
+      receipt,
+      updatedProducts: [],
+      change: 0,
+      ticketText,
+    })
+    setIsReceiptOpen(true)
+  }
+
   // Stock metrics
   const lowStockCount = useMemo(() => products.filter((p) => p.stock > 0 && p.stock <= 5).length, [products])
   const outOfStockCount = useMemo(() => products.filter((p) => p.stock === 0).length, [products])
@@ -376,6 +404,18 @@ export function App() {
         {/* Global Navigation Tabs */}
         <nav className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
           <Button
+            variant={activeTab === 'dashboard' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('dashboard')}
+            className="gap-2 text-xs"
+          >
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            Inicio (F1)
+            {(lowStockCount > 0 || outOfStockCount > 0) && (
+              <span className="flex h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white ml-0.5" />
+            )}
+          </Button>
+          <Button
             variant={activeTab === 'pos' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setActiveTab('pos')}
@@ -387,11 +427,14 @@ export function App() {
           <Button
             variant={activeTab === 'entries' ? 'default' : 'ghost'}
             size="sm"
-            onClick={() => setActiveTab('entries')}
+            onClick={() => {
+              setSelectedProductForEntry(null)
+              setActiveTab('entries')
+            }}
             className="gap-2 text-xs"
           >
             <Truck className="h-3.5 w-3.5" />
-            Ingreso de Mercadería
+            Ingreso Stock (F3)
           </Button>
           <Button
             variant={activeTab === 'stock' ? 'default' : 'ghost'}
@@ -400,7 +443,7 @@ export function App() {
             className="gap-2 text-xs"
           >
             <Package className="h-3.5 w-3.5" />
-            Inventario ({products.length})
+            Inventario (F4)
           </Button>
           <Button
             variant={activeTab === 'suppliers' ? 'default' : 'ghost'}
@@ -411,23 +454,27 @@ export function App() {
             <Layers className="h-3.5 w-3.5" />
             Proveedores ({suppliers.length})
           </Button>
-          <Button
-            variant={activeTab === 'reports' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setActiveTab('reports')}
-            className="gap-2 text-xs"
-          >
-            <TrendingUp className="h-3.5 w-3.5" />
-            Métricas
-            {(lowStockCount > 0 || outOfStockCount > 0) && (
-              <span className="flex h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white ml-0.5" />
-            )}
-          </Button>
         </nav>
       </header>
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+        {activeTab === 'dashboard' && (
+          <DashboardView
+            products={products}
+            receipts={receipts}
+            onNavigate={(tab) => {
+              setSelectedProductForEntry(null)
+              setActiveTab(tab)
+            }}
+            onSelectProductForEntry={(productId) => {
+              setSelectedProductForEntry(productId)
+              setActiveTab('entries')
+            }}
+            onViewReceipt={handleViewReceipt}
+          />
+        )}
+
         {activeTab === 'pos' && (
           <PosView
             products={products}
@@ -440,6 +487,7 @@ export function App() {
             products={products}
             suppliers={suppliers}
             movements={movements}
+            initialProductId={selectedProductForEntry}
             onRegisterEntry={handleRegisterStockEntry}
             onManualAdjustment={handleManualAdjustment}
           />
@@ -457,82 +505,6 @@ export function App() {
             suppliers={suppliers}
             onCreateSupplier={handleCreateSupplier}
           />
-        )}
-
-        {activeTab === 'reports' && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">Métricas y Alertas de Inventario</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
-                  <Package className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-slate-500">Total Artículos</div>
-                  <div className="text-2xl font-bold text-slate-900">{products.length}</div>
-                </div>
-              </div>
-
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
-                  <ShoppingCart className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-slate-500">Comprobantes Emitidos</div>
-                  <div className="text-2xl font-bold text-emerald-600">{receipts.length}</div>
-                </div>
-              </div>
-
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
-                  <AlertTriangle className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-slate-500">Artículos Bajo Stock (&le; 5)</div>
-                  <div className="text-2xl font-bold text-amber-600">{lowStockCount}</div>
-                </div>
-              </div>
-
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-red-50 text-red-600 rounded-lg">
-                  <Package className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-slate-500">Artículos Agotados (0)</div>
-                  <div className="text-2xl font-bold text-red-600">{outOfStockCount}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* List of critical products */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                Artículos que requieren reposición inmediata
-              </h3>
-              <div className="divide-y divide-slate-100">
-                {products
-                  .filter((p) => p.stock <= 5)
-                  .map((p) => (
-                    <div key={p.id} className="py-2.5 flex items-center justify-between text-sm">
-                      <div>
-                        <span className="font-medium text-slate-900">{p.name}</span>
-                        {p.barcode && <span className="text-xs text-slate-400 ml-2 font-mono">{p.barcode}</span>}
-                      </div>
-                      <span className={`font-semibold ${p.stock === 0 ? 'text-red-600' : 'text-amber-600'}`}>
-                        {p.stock === 0 ? 'Agotado (0 unid.)' : `${p.stock} unid. restantes`}
-                      </span>
-                    </div>
-                  ))}
-                {products.filter((p) => p.stock <= 5).length === 0 && (
-                  <p className="text-sm text-slate-500 py-3 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    Todos los artículos tienen stock suficiente.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         )}
       </main>
 
