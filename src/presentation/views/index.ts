@@ -1,2 +1,2 @@
-// Presentation views entry point
-export {}
+export * from './catalog'
+export * from './suppliers/suppliers-view'
