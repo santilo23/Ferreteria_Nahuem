@@ -84,4 +84,32 @@ describe('Receipt and ReceiptItem Entities', () => {
       items: [],
     })).toThrow(ValidationError)
   })
+
+  it('should have status COMPLETED by default and allow cancellation', () => {
+    const item = new ReceiptItem({
+      id: 'item-1',
+      receiptId: 'rec-1',
+      productId: 'prod-1',
+      quantity: 1,
+      unitPrice: 500,
+    })
+
+    const receipt = new Receipt({
+      id: 'rec-1',
+      items: [item],
+    })
+
+    expect(receipt.status).toBe('COMPLETED')
+    expect(receipt.cancelledAt).toBeUndefined()
+    expect(receipt.cancelReason).toBeUndefined()
+
+    receipt.cancel('Devolución de mercadería')
+
+    expect(receipt.status).toBe('CANCELLED')
+    expect(receipt.cancelledAt).toBeInstanceOf(Date)
+    expect(receipt.cancelReason).toBe('Devolución de mercadería')
+
+    // Cannot cancel again
+    expect(() => receipt.cancel()).toThrow(ValidationError)
+  })
 })
