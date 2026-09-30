@@ -7,7 +7,7 @@ import { PosView, ReceiptDialog } from '@/presentation/views/pos'
 import { DashboardView } from '@/presentation/views/dashboard'
 import { ShortcutBar, TabType } from '@/presentation/components/shortcut-bar'
 import { useGlobalShortcuts } from '@/presentation/hooks/use-global-shortcuts'
-import { Package, ShoppingCart, Layers, Truck, LayoutDashboard } from 'lucide-react'
+import { Package, ShoppingCart, Layers, Truck, LayoutDashboard, Wrench } from 'lucide-react'
 import { Product, Supplier, StockMovement, Receipt, ReceiptItem } from '@/core/domain/entities'
 import {
   CreateProductDTO,
@@ -407,12 +407,19 @@ export function App() {
       {/* Top Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-sm sticky top-0 z-30 print:hidden">
         <div className="flex items-center gap-3">
-          <div className="bg-blue-600 text-white p-2 rounded-lg font-bold flex items-center justify-center shadow-sm">
-            <Package className="h-5 w-5" />
+          <div className="bg-gradient-to-br from-blue-700 to-slate-900 text-white p-2.5 rounded-xl font-bold flex items-center justify-center shadow-sm border border-blue-600/30">
+            <Wrench className="h-5 w-5 text-amber-400 -rotate-12" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-900">Ferretería Nahuem</h1>
-            <p className="text-xs text-slate-500">Control de Stock y Facturación Local</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-none">
+                Ferretería Nahuem
+              </h1>
+              <span className="text-[10px] uppercase font-mono font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                Local
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">Control de Stock, Caja y Comprobantes</p>
           </div>
         </div>
 
