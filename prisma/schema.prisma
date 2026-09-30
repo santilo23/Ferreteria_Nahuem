@@ -14,8 +14,10 @@ model Category {
   id          String    @id @default(uuid())
   name        String    @unique
   products    Product[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("categories")
 }
 
 model Supplier {
@@ -26,8 +28,10 @@ model Supplier {
   email       String?
   address     String?
   movements   StockMovement[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@map("suppliers")
 }
 
 model Product {
@@ -38,43 +42,55 @@ model Product {
   cost        Float           // Costo de compra
   stock       Int             @default(0)
   barcode     String?         @unique // Para emulador de lector de código de barras
-  categoryId  String?
+  categoryId  String?         @map("category_id")
   category    Category?       @relation(fields: [categoryId], references: [id])
   movements   StockMovement[]
   receiptItems ReceiptItem[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@map("products")
 }
 
 model StockMovement {
   id          String    @id @default(uuid())
-  productId   String
+  productId   String    @map("product_id")
   product     Product   @relation(fields: [productId], references: [id])
-  supplierId  String?
+  supplierId  String?   @map("supplier_id")
   supplier    Supplier? @relation(fields: [supplierId], references: [id])
   type        String    // IN, OUT, MANUAL
   quantity    Int
   reason      String?
   date        DateTime  @default(now())
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@index([date])
+  @@map("stock_movements")
 }
 
 model Receipt {
   id            String        @id @default(uuid())
-  customerName  String?
-  totalAmount   Float
+  customerName  String?       @map("customer_name")
+  totalAmount   Float         @map("total_amount")
   date          DateTime      @default(now())
   items         ReceiptItem[]
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@index([date])
+  @@map("receipts")
 }
 
 model ReceiptItem {
   id          String   @id @default(uuid())
-  receiptId   String
+  receiptId   String   @map("receipt_id")
   receipt     Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  productId   String
+  productId   String   @map("product_id")
   product     Product  @relation(fields: [productId], references: [id])
   quantity    Int
-  unitPrice   Float
+  unitPrice   Float    @map("unit_price")
   subtotal    Float
+
+  @@map("receipt_items")
 }
