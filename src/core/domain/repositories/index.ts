@@ -1,3 +1,4 @@
-// Domain Repository Interfaces entry point (Clean Architecture Core)
-// Repository interfaces will be defined following TDD in Etapa 2
-export {}
+export * from './product-repository'
+export * from './supplier-repository'
+export * from './stock-movement-repository'
+export * from './receipt-repository'
