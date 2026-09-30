@@ -1,121 +1,88 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Button } from '@/presentation/components/ui/button'
+import { Package, ShoppingCart, Layers, TrendingUp } from 'lucide-react'
 
-function App() {
-  const [count, setCount] = useState(0)
+export function App() {
+  const [activeTab, setActiveTab] = useState<'pos' | 'stock' | 'suppliers' | 'reports'>('pos')
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600 text-white p-2 rounded-lg font-bold flex items-center justify-center">
+            <Package className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">Ferretería Nahuem</h1>
+            <p className="text-xs text-slate-500">Control de Stock y Facturación</p>
+          </div>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+
+        <nav className="flex items-center gap-2">
+          <Button
+            variant={activeTab === 'pos' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('pos')}
+            className="gap-2"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Punto de Venta
+          </Button>
+          <Button
+            variant={activeTab === 'stock' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('stock')}
+            className="gap-2"
+          >
+            <Package className="h-4 w-4" />
+            Inventario
+          </Button>
+          <Button
+            variant={activeTab === 'suppliers' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('suppliers')}
+            className="gap-2"
+          >
+            <Layers className="h-4 w-4" />
+            Proveedores
+          </Button>
+          <Button
+            variant={activeTab === 'reports' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('reports')}
+            className="gap-2"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Métricas
+          </Button>
+        </nav>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold mb-2">Arquitectura Base Inicializada</h2>
+          <p className="text-slate-600 text-sm mb-4">
+            Entorno configurado con Vite, React, TypeScript, Tailwind CSS y shadcn/ui.
           </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Clean Architecture</span>
+              <p className="text-sm font-medium mt-1">/src/core, /src/infrastructure, /src/presentation</p>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Estilos & UI</span>
+              <p className="text-sm font-medium mt-1">Tailwind CSS + shadcn/ui</p>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Desktop Shell</span>
+              <p className="text-sm font-medium mt-1">Tauri v2 Scaffolding</p>
+            </div>
+          </div>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </main>
+    </div>
   )
 }
 
