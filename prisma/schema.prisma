@@ -1,0 +1,80 @@
+// Prisma schema for Ferretería Nahuem
+// SQLite local database
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Supplier {
+  id          String          @id @default(uuid())
+  name        String
+  contact     String?
+  phone       String?
+  email       String?
+  address     String?
+  movements   StockMovement[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Product {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  price       Float           // Precio de venta
+  cost        Float           // Costo de compra
+  stock       Int             @default(0)
+  barcode     String?         @unique // Para emulador de lector de código de barras
+  categoryId  String?
+  category    Category?       @relation(fields: [categoryId], references: [id])
+  movements   StockMovement[]
+  receiptItems ReceiptItem[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model StockMovement {
+  id          String    @id @default(uuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  type        String    // IN, OUT, MANUAL
+  quantity    Int
+  reason      String?
+  date        DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+}
+
+model Receipt {
+  id            String        @id @default(uuid())
+  customerName  String?
+  totalAmount   Float
+  date          DateTime      @default(now())
+  items         ReceiptItem[]
+  createdAt     DateTime      @default(now())
+}
+
+model ReceiptItem {
+  id          String   @id @default(uuid())
+  receiptId   String
+  receipt     Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Float
+  subtotal    Float
+}
