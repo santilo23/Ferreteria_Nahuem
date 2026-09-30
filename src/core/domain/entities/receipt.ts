@@ -46,12 +46,17 @@ export class ReceiptItem {
   }
 }
 
+export type ReceiptStatus = 'COMPLETED' | 'CANCELLED'
+
 export interface ReceiptProps {
   id: string
   customerName?: string
   items: ReceiptItem[]
   date?: Date
   createdAt?: Date
+  status?: ReceiptStatus
+  cancelledAt?: Date
+  cancelReason?: string
 }
 
 export class Receipt {
@@ -62,6 +67,10 @@ export class Receipt {
   readonly date: Date
   readonly createdAt: Date
 
+  private _status: ReceiptStatus
+  private _cancelledAt?: Date
+  private _cancelReason?: string
+
   constructor(props: ReceiptProps) {
     this.validate(props)
 
@@ -71,6 +80,31 @@ export class Receipt {
     this.totalAmount = this.items.reduce((sum, item) => sum + item.subtotal, 0)
     this.date = props.date ?? new Date()
     this.createdAt = props.createdAt ?? new Date()
+
+    this._status = props.status ?? 'COMPLETED'
+    this._cancelledAt = props.cancelledAt
+    this._cancelReason = props.cancelReason
+  }
+
+  get status(): ReceiptStatus {
+    return this._status
+  }
+
+  get cancelledAt(): Date | undefined {
+    return this._cancelledAt
+  }
+
+  get cancelReason(): string | undefined {
+    return this._cancelReason
+  }
+
+  cancel(reason?: string): void {
+    if (this._status === 'CANCELLED') {
+      throw new ValidationError('El comprobante ya se encuentra anulado')
+    }
+    this._status = 'CANCELLED'
+    this._cancelledAt = new Date()
+    this._cancelReason = reason?.trim() || 'Venta anulada por el operador'
   }
 
   private validate(props: ReceiptProps): void {
