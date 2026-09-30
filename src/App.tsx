@@ -1,11 +1,20 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button } from '@/presentation/components/ui/button'
 import { CatalogView } from '@/presentation/views/catalog'
 import { SuppliersView } from '@/presentation/views/suppliers/suppliers-view'
 import { StockEntryView } from '@/presentation/views/stock-entry/stock-entry-view'
+import { PosView, ReceiptDialog } from '@/presentation/views/pos'
 import { Package, ShoppingCart, Layers, TrendingUp, AlertTriangle, CheckCircle2, Truck } from 'lucide-react'
-import { Product, Supplier, StockMovement } from '@/core/domain/entities'
-import { CreateProductDTO, CreateSupplierDTO, RegisterStockEntryDTO, ManualStockAdjustmentDTO } from '@/core/use-cases'
+import { Product, Supplier, StockMovement, Receipt, ReceiptItem } from '@/core/domain/entities'
+import {
+  CreateProductDTO,
+  CreateSupplierDTO,
+  RegisterStockEntryDTO,
+  ManualStockAdjustmentDTO,
+  ProcessSaleDTO,
+  ProcessSaleResult,
+} from '@/core/use-cases'
+import { ReceiptFormatter } from '@/core/services/receipt-formatter'
 
 // Initial seed products for rich initial experience
 const initialProducts: Product[] = [
@@ -96,13 +105,29 @@ const initialMovements: StockMovement[] = [
 ]
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'pos' | 'stock' | 'entries' | 'suppliers' | 'reports'>('entries')
+  const [activeTab, setActiveTab] = useState<'pos' | 'stock' | 'entries' | 'suppliers' | 'reports'>('pos')
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers)
   const [movements, setMovements] = useState<StockMovement[]>(initialMovements)
+  const [receipts, setReceipts] = useState<Receipt[]>([])
+
+  // Printable receipt modal state
+  const [currentSaleResult, setCurrentSaleResult] = useState<ProcessSaleResult | null>(null)
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false)
+
+  // Global hotkeys (F2 -> POS)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault()
+        setActiveTab('pos')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const handleCreateProduct = async (dto: CreateProductDTO): Promise<Product> => {
-    // Check barcode uniqueness
     if (dto.barcode && dto.barcode.trim()) {
       const exists = products.some((p) => p.barcode === dto.barcode?.trim())
       if (exists) {
@@ -226,6 +251,110 @@ export function App() {
     return updated
   }
 
+  const handleProcessSale = async (dto: ProcessSaleDTO): Promise<ProcessSaleResult> => {
+    // 1. Verify stocks
+    for (const item of dto.items) {
+      const prod = products.find((p) => p.id === item.productId)
+      if (!prod) {
+        throw new Error(`Producto ${item.productId} no encontrado`)
+      }
+      if (prod.stock < item.quantity) {
+        throw new Error(`Stock insuficiente para "${prod.name}". Disponible: ${prod.stock}, solicitado: ${item.quantity}`)
+      }
+    }
+
+    // 2. Deduct stocks and create receipt
+    const receiptId = crypto.randomUUID()
+    const receiptItems: ReceiptItem[] = []
+    const newMovements: StockMovement[] = []
+    const updatedProductsList: Product[] = []
+    const itemsDetail: Array<{ name: string; quantity: number; unitPrice: number; subtotal: number }> = []
+
+    setProducts((prev) => {
+      const next = [...prev]
+      for (const item of dto.items) {
+        const idx = next.findIndex((p) => p.id === item.productId)
+        const currentProd = next[idx]
+
+        const updatedProd = new Product({
+          id: currentProd.id,
+          name: currentProd.name,
+          description: currentProd.description,
+          price: currentProd.price,
+          cost: currentProd.cost,
+          stock: currentProd.stock - item.quantity,
+          barcode: currentProd.barcode,
+          categoryId: currentProd.categoryId,
+        })
+        next[idx] = updatedProd
+        updatedProductsList.push(updatedProd)
+
+        const rItem = new ReceiptItem({
+          id: crypto.randomUUID(),
+          receiptId,
+          productId: currentProd.id,
+          quantity: item.quantity,
+          unitPrice: currentProd.price,
+        })
+        receiptItems.push(rItem)
+
+        itemsDetail.push({
+          name: currentProd.name,
+          quantity: item.quantity,
+          unitPrice: currentProd.price,
+          subtotal: rItem.subtotal,
+        })
+
+        newMovements.push(
+          new StockMovement({
+            id: crypto.randomUUID(),
+            productId: currentProd.id,
+            type: 'OUT',
+            quantity: item.quantity,
+            reason: `Venta Ticket #${receiptId.slice(0, 8).toUpperCase()}`,
+            date: new Date(),
+          })
+        )
+      }
+      return next
+    })
+
+    const receipt = new Receipt({
+      id: receiptId,
+      customerName: dto.customerName || 'Consumidor Final',
+      items: receiptItems,
+      date: new Date(),
+    })
+
+    setReceipts((prev) => [receipt, ...prev])
+    setMovements((prev) => [...newMovements, ...prev])
+
+    const change =
+      dto.amountPaid !== undefined && dto.amountPaid >= receipt.totalAmount
+        ? dto.amountPaid - receipt.totalAmount
+        : 0
+
+    const ticketText = ReceiptFormatter.formatThermalTicket({
+      receipt,
+      paymentMethod: dto.paymentMethod,
+      amountPaid: dto.amountPaid,
+      change,
+      itemsDetail,
+    })
+
+    const result: ProcessSaleResult = {
+      receipt,
+      updatedProducts: updatedProductsList,
+      change,
+      ticketText,
+    }
+
+    setCurrentSaleResult(result)
+    setIsReceiptOpen(true)
+
+    return result
+  }
+
   // Stock metrics
   const lowStockCount = useMemo(() => products.filter((p) => p.stock > 0 && p.stock <= 5).length, [products])
   const outOfStockCount = useMemo(() => products.filter((p) => p.stock === 0).length, [products])
@@ -233,14 +362,14 @@ export function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Top Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-sm sticky top-0 z-30">
+      <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-sm sticky top-0 z-30 print:hidden">
         <div className="flex items-center gap-3">
           <div className="bg-blue-600 text-white p-2 rounded-lg font-bold flex items-center justify-center shadow-sm">
             <Package className="h-5 w-5" />
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-slate-900">Ferretería Nahuem</h1>
-            <p className="text-xs text-slate-500">Control de Stock y Gestión Local</p>
+            <p className="text-xs text-slate-500">Control de Stock y Facturación Local</p>
           </div>
         </div>
 
@@ -253,7 +382,7 @@ export function App() {
             className="gap-2 text-xs"
           >
             <ShoppingCart className="h-3.5 w-3.5" />
-            Punto de Venta
+            Punto de Venta (F2)
           </Button>
           <Button
             variant={activeTab === 'entries' ? 'default' : 'ghost'}
@@ -299,6 +428,13 @@ export function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+        {activeTab === 'pos' && (
+          <PosView
+            products={products}
+            onProcessSale={handleProcessSale}
+          />
+        )}
+
         {activeTab === 'entries' && (
           <StockEntryView
             products={products}
@@ -323,25 +459,10 @@ export function App() {
           />
         )}
 
-        {activeTab === 'pos' && (
-          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center max-w-lg mx-auto mt-12 shadow-sm">
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4">
-              <ShoppingCart className="h-6 w-6" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Módulo de Punto de Venta (POS)</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              En la <strong>Etapa 5</strong> implementaremos el Omnibox con Fuzzy Search optimizado para teclado y emisión de comprobantes.
-            </p>
-            <Button onClick={() => setActiveTab('entries')} variant="outline">
-              Ir a Ingreso de Mercadería
-            </Button>
-          </div>
-        )}
-
         {activeTab === 'reports' && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold tracking-tight text-slate-900">Métricas y Alertas de Inventario</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
                   <Package className="h-6 w-6" />
@@ -353,11 +474,21 @@ export function App() {
               </div>
 
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <ShoppingCart className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-slate-500">Comprobantes Emitidos</div>
+                  <div className="text-2xl font-bold text-emerald-600">{receipts.length}</div>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
                 <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
                   <AlertTriangle className="h-6 w-6" />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-500">Artículos con Bajo Stock (&le; 5)</div>
+                  <div className="text-xs font-semibold text-slate-500">Artículos Bajo Stock (&le; 5)</div>
                   <div className="text-2xl font-bold text-amber-600">{lowStockCount}</div>
                 </div>
               </div>
@@ -404,6 +535,13 @@ export function App() {
           </div>
         )}
       </main>
+
+      {/* Printable Receipt Modal */}
+      <ReceiptDialog
+        saleResult={currentSaleResult}
+        open={isReceiptOpen}
+        onClose={() => setIsReceiptOpen(false)}
+      />
     </div>
   )
 }
