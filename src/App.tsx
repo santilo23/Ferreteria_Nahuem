@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react'
 import { Button } from '@/presentation/components/ui/button'
 import { CatalogView } from '@/presentation/views/catalog'
 import { SuppliersView } from '@/presentation/views/suppliers/suppliers-view'
-import { Package, ShoppingCart, Layers, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react'
-import { Product, Supplier } from '@/core/domain/entities'
-import { CreateProductDTO, CreateSupplierDTO } from '@/core/use-cases'
+import { StockEntryView } from '@/presentation/views/stock-entry/stock-entry-view'
+import { Package, ShoppingCart, Layers, TrendingUp, AlertTriangle, CheckCircle2, Truck } from 'lucide-react'
+import { Product, Supplier, StockMovement } from '@/core/domain/entities'
+import { CreateProductDTO, CreateSupplierDTO, RegisterStockEntryDTO, ManualStockAdjustmentDTO } from '@/core/use-cases'
 
 // Initial seed products for rich initial experience
 const initialProducts: Product[] = [
@@ -74,10 +75,31 @@ const initialSuppliers: Supplier[] = [
   }),
 ]
 
+const initialMovements: StockMovement[] = [
+  new StockMovement({
+    id: 'm-1',
+    productId: 'p-1',
+    supplierId: 's-2',
+    type: 'IN',
+    quantity: 50,
+    reason: 'Remito R-0001-002341',
+    date: new Date('2026-09-28T09:30:00'),
+  }),
+  new StockMovement({
+    id: 'm-2',
+    productId: 'p-4',
+    type: 'MANUAL',
+    quantity: 2,
+    reason: 'Rotura durante acomodación en estantería',
+    date: new Date('2026-09-29T14:15:00'),
+  }),
+]
+
 export function App() {
-  const [activeTab, setActiveTab] = useState<'pos' | 'stock' | 'suppliers' | 'reports'>('stock')
+  const [activeTab, setActiveTab] = useState<'pos' | 'stock' | 'entries' | 'suppliers' | 'reports'>('entries')
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers)
+  const [movements, setMovements] = useState<StockMovement[]>(initialMovements)
 
   const handleCreateProduct = async (dto: CreateProductDTO): Promise<Product> => {
     // Check barcode uniqueness
@@ -116,6 +138,94 @@ export function App() {
     return newSupplier
   }
 
+  const handleRegisterStockEntry = async (dto: RegisterStockEntryDTO): Promise<Product> => {
+    const index = products.findIndex((p) => p.id === dto.productId)
+    if (index === -1) {
+      throw new Error('Producto no encontrado')
+    }
+
+    const current = products[index]
+    const updated = new Product({
+      id: current.id,
+      name: current.name,
+      description: current.description,
+      price: current.price,
+      cost: dto.cost !== undefined ? dto.cost : current.cost,
+      stock: current.stock + dto.quantity,
+      barcode: current.barcode,
+      categoryId: current.categoryId,
+    })
+
+    const newMovement = new StockMovement({
+      id: crypto.randomUUID(),
+      productId: current.id,
+      supplierId: dto.supplierId,
+      type: 'IN',
+      quantity: dto.quantity,
+      reason: dto.reason,
+      date: dto.date ?? new Date(),
+    })
+
+    setProducts((prev) => {
+      const copy = [...prev]
+      copy[index] = updated
+      return copy
+    })
+
+    setMovements((prev) => [newMovement, ...prev])
+    return updated
+  }
+
+  const handleManualAdjustment = async (dto: ManualStockAdjustmentDTO): Promise<Product> => {
+    const index = products.findIndex((p) => p.id === dto.productId)
+    if (index === -1) {
+      throw new Error('Producto no encontrado')
+    }
+
+    const current = products[index]
+    let newStock = current.stock
+
+    if (dto.mode === 'SET') {
+      newStock = dto.quantity
+    } else if (dto.mode === 'SUBTRACT') {
+      if (current.stock - dto.quantity < 0) {
+        throw new Error(`Stock insuficiente. Stock actual: ${current.stock}`)
+      }
+      newStock = current.stock - dto.quantity
+    } else if (dto.mode === 'ADD') {
+      newStock = current.stock + dto.quantity
+    }
+
+    const updated = new Product({
+      id: current.id,
+      name: current.name,
+      description: current.description,
+      price: current.price,
+      cost: current.cost,
+      stock: newStock,
+      barcode: current.barcode,
+      categoryId: current.categoryId,
+    })
+
+    const newMovement = new StockMovement({
+      id: crypto.randomUUID(),
+      productId: current.id,
+      type: 'MANUAL',
+      quantity: Math.abs(newStock - current.stock) || dto.quantity,
+      reason: dto.reason,
+      date: new Date(),
+    })
+
+    setProducts((prev) => {
+      const copy = [...prev]
+      copy[index] = updated
+      return copy
+    })
+
+    setMovements((prev) => [newMovement, ...prev])
+    return updated
+  }
+
   // Stock metrics
   const lowStockCount = useMemo(() => products.filter((p) => p.stock > 0 && p.stock <= 5).length, [products])
   const outOfStockCount = useMemo(() => products.filter((p) => p.stock === 0).length, [products])
@@ -144,6 +254,15 @@ export function App() {
           >
             <ShoppingCart className="h-3.5 w-3.5" />
             Punto de Venta
+          </Button>
+          <Button
+            variant={activeTab === 'entries' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('entries')}
+            className="gap-2 text-xs"
+          >
+            <Truck className="h-3.5 w-3.5" />
+            Ingreso de Mercadería
           </Button>
           <Button
             variant={activeTab === 'stock' ? 'default' : 'ghost'}
@@ -180,6 +299,16 @@ export function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+        {activeTab === 'entries' && (
+          <StockEntryView
+            products={products}
+            suppliers={suppliers}
+            movements={movements}
+            onRegisterEntry={handleRegisterStockEntry}
+            onManualAdjustment={handleManualAdjustment}
+          />
+        )}
+
         {activeTab === 'stock' && (
           <CatalogView
             products={products}
@@ -203,8 +332,8 @@ export function App() {
             <p className="text-sm text-slate-600 mb-4">
               En la <strong>Etapa 5</strong> implementaremos el Omnibox con Fuzzy Search optimizado para teclado y emisión de comprobantes.
             </p>
-            <Button onClick={() => setActiveTab('stock')} variant="outline">
-              Ir al Catálogo de Inventario
+            <Button onClick={() => setActiveTab('entries')} variant="outline">
+              Ir a Ingreso de Mercadería
             </Button>
           </div>
         )}
