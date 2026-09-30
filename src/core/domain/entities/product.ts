@@ -93,6 +93,22 @@ export class Product {
     this._updatedAt = new Date()
   }
 
+  updateCost(newCost: number): void {
+    if (newCost < 0) {
+      throw new ValidationError('El costo del producto no puede ser negativo')
+    }
+    this._cost = newCost
+    this._updatedAt = new Date()
+  }
+
+  updatePrice(newPrice: number): void {
+    if (newPrice < 0) {
+      throw new ValidationError('El precio del producto no puede ser negativo')
+    }
+    this._price = newPrice
+    this._updatedAt = new Date()
+  }
+
   private validate(props: ProductProps): void {
     if (!props.id || typeof props.id !== 'string') {
       throw new ValidationError('El id del producto es obligatorio')
