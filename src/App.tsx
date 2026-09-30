@@ -1,10 +1,12 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Button } from '@/presentation/components/ui/button'
 import { CatalogView } from '@/presentation/views/catalog'
 import { SuppliersView } from '@/presentation/views/suppliers/suppliers-view'
 import { StockEntryView } from '@/presentation/views/stock-entry/stock-entry-view'
 import { PosView, ReceiptDialog } from '@/presentation/views/pos'
 import { DashboardView } from '@/presentation/views/dashboard'
+import { ShortcutBar, TabType } from '@/presentation/components/shortcut-bar'
+import { useGlobalShortcuts } from '@/presentation/hooks/use-global-shortcuts'
 import { Package, ShoppingCart, Layers, Truck, LayoutDashboard } from 'lucide-react'
 import { Product, Supplier, StockMovement, Receipt, ReceiptItem } from '@/core/domain/entities'
 import {
@@ -117,17 +119,30 @@ export function App() {
   const [currentSaleResult, setCurrentSaleResult] = useState<ProcessSaleResult | null>(null)
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
 
-  // Global hotkeys (F2 -> POS)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F2') {
-        e.preventDefault()
-        setActiveTab('pos')
+  useGlobalShortcuts({
+    onNavigateDashboard: () => {
+      setSelectedProductForEntry(null)
+      setActiveTab('dashboard')
+    },
+    onNavigatePos: () => {
+      setActiveTab('pos')
+    },
+    onNavigateEntries: () => {
+      setSelectedProductForEntry(null)
+      setActiveTab('entries')
+    },
+    onNavigateStock: () => {
+      setActiveTab('stock')
+    },
+    onNavigateSuppliers: () => {
+      setActiveTab('suppliers')
+    },
+    onEscape: () => {
+      if (isReceiptOpen) {
+        setIsReceiptOpen(false)
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+    },
+  })
 
   const handleCreateProduct = async (dto: CreateProductDTO): Promise<Product> => {
     if (dto.barcode && dto.barcode.trim()) {
@@ -507,6 +522,15 @@ export function App() {
           />
         )}
       </main>
+
+      {/* Sticky Bottom Shortcut Bar */}
+      <ShortcutBar
+        activeTab={activeTab}
+        onTabChange={(tab: TabType) => {
+          setSelectedProductForEntry(null)
+          setActiveTab(tab)
+        }}
+      />
 
       {/* Printable Receipt Modal */}
       <ReceiptDialog
