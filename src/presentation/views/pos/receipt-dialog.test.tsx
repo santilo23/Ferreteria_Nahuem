@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ReceiptDialog } from './receipt-dialog'
 import { ProcessSaleResult } from '@/core/use-cases'
 import { Receipt, ReceiptItem } from '@/core/domain/entities'
+import { PrintService } from '@/presentation/lib/print-service'
 
 describe('ReceiptDialog Component (Print & Thermal Layout)', () => {
   const mockItem = new ReceiptItem({
@@ -39,8 +40,8 @@ describe('ReceiptDialog Component (Print & Thermal Layout)', () => {
     expect(screen.getByText(/COMPROBANTE NO FISCAL/i)).toBeInTheDocument()
   })
 
-  it('should trigger window.print when "Imprimir Comprobante" is clicked', () => {
-    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+  it('should trigger PrintService.printHtml when "Imprimir Comprobante" is clicked', () => {
+    const printSpy = vi.spyOn(PrintService, 'printHtml').mockImplementation(() => {})
 
     render(<ReceiptDialog saleResult={mockSaleResult} open={true} onClose={mockClose} />)
 
@@ -49,5 +50,17 @@ describe('ReceiptDialog Component (Print & Thermal Layout)', () => {
 
     expect(printSpy).toHaveBeenCalled()
     printSpy.mockRestore()
+  })
+
+  it('should trigger PrintService.downloadTicketFile when "Descargar" is clicked', () => {
+    const downloadSpy = vi.spyOn(PrintService, 'downloadTicketFile').mockImplementation(() => {})
+
+    render(<ReceiptDialog saleResult={mockSaleResult} open={true} onClose={mockClose} />)
+
+    const downloadBtn = screen.getByRole('button', { name: /descargar/i })
+    fireEvent.click(downloadBtn)
+
+    expect(downloadSpy).toHaveBeenCalled()
+    downloadSpy.mockRestore()
   })
 })

@@ -8,16 +8,19 @@ import {
   DialogTitle,
 } from '@/presentation/components/ui/dialog'
 import { Button } from '@/presentation/components/ui/button'
-import { Printer, Copy, Check, CheckCircle2 } from 'lucide-react'
+import { Printer, Copy, Check, CheckCircle2, FileDown } from 'lucide-react'
 import { ProcessSaleResult } from '@/core/use-cases'
+import { Product } from '@/core/domain/entities'
+import { PrintService } from '@/presentation/lib/print-service'
 
 interface ReceiptDialogProps {
   saleResult: ProcessSaleResult | null
+  products?: Product[]
   open: boolean
   onClose: () => void
 }
 
-export function ReceiptDialog({ saleResult, open, onClose }: ReceiptDialogProps) {
+export function ReceiptDialog({ saleResult, products, open, onClose }: ReceiptDialogProps) {
   const [copied, setCopied] = useState(false)
 
   if (!saleResult) return null
@@ -25,7 +28,19 @@ export function ReceiptDialog({ saleResult, open, onClose }: ReceiptDialogProps)
   const { receipt, ticketText, change } = saleResult
 
   const handlePrint = () => {
-    window.print()
+    const el = document.getElementById('printable-receipt')
+    if (el) {
+      PrintService.printHtml(el.innerHTML, `Ticket #${receipt.id.slice(0, 8).toUpperCase()}`)
+    } else {
+      window.print()
+    }
+  }
+
+  const handleDownload = () => {
+    PrintService.downloadTicketFile(
+      `ticket_${receipt.id.slice(0, 8).toLowerCase()}.txt`,
+      ticketText
+    )
   }
 
   const handleCopy = () => {
@@ -77,17 +92,21 @@ export function ReceiptDialog({ saleResult, open, onClose }: ReceiptDialogProps)
               <span>SUBTOTAL</span>
             </div>
             <div className="space-y-1.5">
-              {receipt.items.map((item) => (
-                <div key={item.id} className="flex justify-between items-center text-slate-800">
-                  <div className="truncate max-w-[190px]">
-                    <span className="font-bold mr-1">{item.quantity}x</span>
-                    <span>Art. #{item.productId.slice(0, 8)}</span>
+              {receipt.items.map((item) => {
+                const prod = products?.find((p) => p.id === item.productId)
+                const displayName = prod ? prod.name : `Art. #${item.productId.slice(0, 8)}`
+                return (
+                  <div key={item.id} className="flex justify-between items-center text-slate-800">
+                    <div className="truncate max-w-[200px]" title={displayName}>
+                      <span className="font-bold mr-1">{item.quantity}x</span>
+                      <span>{displayName}</span>
+                    </div>
+                    <span className="font-semibold shrink-0">
+                      ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
-                  <span className="font-semibold shrink-0">
-                    ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -114,11 +133,17 @@ export function ReceiptDialog({ saleResult, open, onClose }: ReceiptDialogProps)
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0 print:hidden">
-          <div className="flex items-center gap-2 w-full justify-between">
-            <Button type="button" variant="outline" size="sm" onClick={handleCopy} className="gap-1.5 text-xs">
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? '¡Copiado!' : 'Copiar Ticket'}
-            </Button>
+          <div className="flex flex-wrap items-center gap-2 w-full justify-between">
+            <div className="flex items-center gap-1.5">
+              <Button type="button" variant="outline" size="sm" onClick={handleCopy} className="gap-1.5 text-xs">
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? '¡Copiado!' : 'Copiar'}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={handleDownload} className="gap-1.5 text-xs">
+                <FileDown className="h-3.5 w-3.5 text-blue-600" />
+                Descargar
+              </Button>
+            </div>
 
             <div className="flex items-center gap-2">
               <Button type="button" size="sm" onClick={handlePrint} className="gap-1.5 text-xs bg-slate-800 hover:bg-slate-900">
@@ -126,7 +151,7 @@ export function ReceiptDialog({ saleResult, open, onClose }: ReceiptDialogProps)
                 Imprimir Comprobante
               </Button>
               <Button type="button" variant="default" size="sm" onClick={onClose} className="text-xs">
-                Nueva Venta (Esc)
+                Cerrar (Esc)
               </Button>
             </div>
           </div>

@@ -542,6 +542,7 @@ export function App() {
       {/* Printable Receipt Modal */}
       <ReceiptDialog
         saleResult={currentSaleResult}
+        products={products}
         open={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}
       />
