@@ -1,13 +1,15 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button } from '@/presentation/components/ui/button'
 import { CatalogView } from '@/presentation/views/catalog'
 import { SuppliersView } from '@/presentation/views/suppliers/suppliers-view'
 import { StockEntryView } from '@/presentation/views/stock-entry/stock-entry-view'
 import { PosView, ReceiptDialog } from '@/presentation/views/pos'
 import { DashboardView } from '@/presentation/views/dashboard'
+import { SalesHistoryView } from '@/presentation/views/sales-history'
+import { BackupDialog } from '@/presentation/components/backup-dialog'
 import { ShortcutBar, TabType } from '@/presentation/components/shortcut-bar'
 import { useGlobalShortcuts } from '@/presentation/hooks/use-global-shortcuts'
-import { Package, ShoppingCart, Layers, Truck, LayoutDashboard, Wrench } from 'lucide-react'
+import { Package, ShoppingCart, Layers, Truck, LayoutDashboard, Wrench, ReceiptText, Database } from 'lucide-react'
 import { Product, Supplier, StockMovement, Receipt, ReceiptItem } from '@/core/domain/entities'
 import {
   CreateProductDTO,
@@ -17,7 +19,7 @@ import {
   ProcessSaleDTO,
   ProcessSaleResult,
 } from '@/core/use-cases'
-import { ReceiptFormatter } from '@/core/services/receipt-formatter'
+import { ReceiptFormatter, BackupService, BackupPayload } from '@/core/services'
 
 // Initial seed products for rich initial experience
 const initialProducts: Product[] = [
@@ -107,17 +109,58 @@ const initialMovements: StockMovement[] = [
   }),
 ]
 
+const STORAGE_KEY = 'nahuem_data_v1'
+
+const loadInitialData = (): {
+  products: Product[]
+  suppliers: Supplier[]
+  movements: StockMovement[]
+  receipts: Receipt[]
+} => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      return BackupService.importFromJson(raw)
+    }
+  } catch (err) {
+    console.warn('No se pudo cargar desde localStorage, usando datos semilla:', err)
+  }
+  return {
+    products: initialProducts,
+    suppliers: initialSuppliers,
+    movements: initialMovements,
+    receipts: [],
+  }
+}
+
 export function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'entries' | 'stock' | 'suppliers'>('dashboard')
-  const [products, setProducts] = useState<Product[]>(initialProducts)
-  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers)
-  const [movements, setMovements] = useState<StockMovement[]>(initialMovements)
-  const [receipts, setReceipts] = useState<Receipt[]>([])
+  const initial = useMemo(() => loadInitialData(), [])
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard')
+  const [products, setProducts] = useState<Product[]>(initial.products)
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initial.suppliers)
+  const [movements, setMovements] = useState<StockMovement[]>(initial.movements)
+  const [receipts, setReceipts] = useState<Receipt[]>(initial.receipts)
   const [selectedProductForEntry, setSelectedProductForEntry] = useState<string | null>(null)
 
-  // Printable receipt modal state
+  // Modals state
   const [currentSaleResult, setCurrentSaleResult] = useState<ProcessSaleResult | null>(null)
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
+  const [isBackupOpen, setIsBackupOpen] = useState(false)
+
+  // Auto-persist to localStorage on every change
+  useEffect(() => {
+    try {
+      const serialized = BackupService.exportToJson({
+        products,
+        suppliers,
+        movements,
+        receipts,
+      })
+      localStorage.setItem(STORAGE_KEY, serialized)
+    } catch (err) {
+      console.error('Error guardando en localStorage:', err)
+    }
+  }, [products, suppliers, movements, receipts])
 
   useGlobalShortcuts({
     onNavigateDashboard: () => {
@@ -134,13 +177,15 @@ export function App() {
     onNavigateStock: () => {
       setActiveTab('stock')
     },
+    onNavigateSales: () => {
+      setActiveTab('sales')
+    },
     onNavigateSuppliers: () => {
       setActiveTab('suppliers')
     },
     onEscape: () => {
-      if (isReceiptOpen) {
-        setIsReceiptOpen(false)
-      }
+      if (isReceiptOpen) setIsReceiptOpen(false)
+      if (isBackupOpen) setIsBackupOpen(false)
     },
   })
 
@@ -398,6 +443,67 @@ export function App() {
     setIsReceiptOpen(true)
   }
 
+  const handleVoidSale = async (receiptId: string, reason?: string) => {
+    const rIdx = receipts.findIndex((r) => r.id === receiptId)
+    if (rIdx === -1) throw new Error('Comprobante no encontrado')
+
+    const targetReceipt = receipts[rIdx]
+    if (targetReceipt.status === 'CANCELLED') {
+      throw new Error('El comprobante ya se encuentra anulado')
+    }
+
+    targetReceipt.cancel(reason)
+
+    const newMovements: StockMovement[] = []
+    setProducts((prev) => {
+      const next = [...prev]
+      for (const item of targetReceipt.items) {
+        const pIdx = next.findIndex((p) => p.id === item.productId)
+        if (pIdx !== -1) {
+          const currentP = next[pIdx]
+          const updatedP = new Product({
+            id: currentP.id,
+            name: currentP.name,
+            description: currentP.description,
+            price: currentP.price,
+            cost: currentP.cost,
+            stock: currentP.stock + item.quantity,
+            barcode: currentP.barcode,
+            categoryId: currentP.categoryId,
+          })
+          next[pIdx] = updatedP
+
+          newMovements.push(
+            new StockMovement({
+              id: crypto.randomUUID(),
+              productId: currentP.id,
+              type: 'IN',
+              quantity: item.quantity,
+              reason: `Anulación Venta Ticket #${targetReceipt.id.slice(0, 8).toUpperCase()}${reason ? `: ${reason}` : ''}`,
+              date: new Date(),
+            })
+          )
+        }
+      }
+      return next
+    })
+
+    setReceipts((prev) => {
+      const copy = [...prev]
+      copy[rIdx] = targetReceipt
+      return copy
+    })
+
+    setMovements((prev) => [...newMovements, ...prev])
+  }
+
+  const handleRestoreBackup = (payload: BackupPayload) => {
+    setProducts(payload.products)
+    setSuppliers(payload.suppliers)
+    setMovements(payload.movements)
+    setReceipts(payload.receipts)
+  }
+
   // Stock metrics
   const lowStockCount = useMemo(() => products.filter((p) => p.stock > 0 && p.stock <= 5).length, [products])
   const outOfStockCount = useMemo(() => products.filter((p) => p.stock === 0).length, [products])
@@ -468,6 +574,15 @@ export function App() {
             Inventario (F4)
           </Button>
           <Button
+            variant={activeTab === 'sales' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('sales')}
+            className="gap-2 text-xs"
+          >
+            <ReceiptText className="h-3.5 w-3.5" />
+            Ventas (F5)
+          </Button>
+          <Button
             variant={activeTab === 'suppliers' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setActiveTab('suppliers')}
@@ -477,6 +592,19 @@ export function App() {
             Proveedores ({suppliers.length})
           </Button>
         </nav>
+
+        {/* Header Right Actions */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsBackupOpen(true)}
+            className="gap-1.5 text-xs border-slate-300 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 shadow-2xs"
+          >
+            <Database className="h-3.5 w-3.5 text-blue-600" />
+            <span className="hidden sm:inline">Respaldos</span>
+          </Button>
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -522,6 +650,19 @@ export function App() {
           />
         )}
 
+        {activeTab === 'sales' && (
+          <SalesHistoryView
+            receipts={receipts}
+            products={products}
+            onViewReceipt={handleViewReceipt}
+            onVoidSale={handleVoidSale}
+            onNavigate={(tab) => {
+              setSelectedProductForEntry(null)
+              setActiveTab(tab)
+            }}
+          />
+        )}
+
         {activeTab === 'suppliers' && (
           <SuppliersView
             suppliers={suppliers}
@@ -537,6 +678,7 @@ export function App() {
           setSelectedProductForEntry(null)
           setActiveTab(tab)
         }}
+        onOpenBackup={() => setIsBackupOpen(true)}
       />
 
       {/* Printable Receipt Modal */}
@@ -545,6 +687,17 @@ export function App() {
         products={products}
         open={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}
+      />
+
+      {/* Backup & Restore Modal */}
+      <BackupDialog
+        open={isBackupOpen}
+        onClose={() => setIsBackupOpen(false)}
+        products={products}
+        suppliers={suppliers}
+        movements={movements}
+        receipts={receipts}
+        onRestoreBackup={handleRestoreBackup}
       />
     </div>
   )

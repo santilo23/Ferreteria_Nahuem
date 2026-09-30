@@ -54,7 +54,7 @@ export class VoidSaleUseCase {
           date: new Date(),
         })
 
-        await this.stockMovementRepository.create(movement)
+        await this.stockMovementRepository.save(movement)
         movements.push(movement)
       }
     }

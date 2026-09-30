@@ -5,6 +5,7 @@ export interface UseGlobalShortcutsOptions {
   onNavigatePos?: () => void
   onNavigateEntries?: () => void
   onNavigateStock?: () => void
+  onNavigateSales?: () => void
   onNavigateSuppliers?: () => void
   onEscape?: () => void
   enabled?: boolean
@@ -15,6 +16,7 @@ export function useGlobalShortcuts({
   onNavigatePos,
   onNavigateEntries,
   onNavigateStock,
+  onNavigateSales,
   onNavigateSuppliers,
   onEscape,
   enabled = true,
@@ -42,6 +44,14 @@ export function useGlobalShortcuts({
           break
         case 'F5':
           // Prevent browser refresh so desktop app remains in state
+          e.preventDefault()
+          if (onNavigateSales) {
+            onNavigateSales()
+          } else {
+            onNavigateSuppliers?.()
+          }
+          break
+        case 'F6':
           e.preventDefault()
           onNavigateSuppliers?.()
           break

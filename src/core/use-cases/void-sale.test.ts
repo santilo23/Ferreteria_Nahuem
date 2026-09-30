@@ -44,16 +44,17 @@ describe('VoidSaleUseCase', () => {
     }
 
     productRepository = {
-      create: vi.fn(),
+      save: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
+      search: vi.fn(),
       findById: vi.fn().mockResolvedValue(mockProduct),
       findByBarcode: vi.fn(),
       findAll: vi.fn(),
-      findLowStock: vi.fn(),
     }
 
     stockMovementRepository = {
-      create: vi.fn(),
+      save: vi.fn(),
       findByProductId: vi.fn(),
       findAll: vi.fn(),
     }
@@ -97,8 +98,8 @@ describe('VoidSaleUseCase', () => {
     expect(productRepository.update).toHaveBeenCalledWith(mockProduct)
 
     // 3. Movement 'IN' is created for restitution
-    expect(stockMovementRepository.create).toHaveBeenCalledTimes(1)
-    const createdMovement = vi.mocked(stockMovementRepository.create).mock.calls[0][0] as StockMovement
+    expect(stockMovementRepository.save).toHaveBeenCalledTimes(1)
+    const createdMovement = vi.mocked(stockMovementRepository.save).mock.calls[0][0] as StockMovement
     expect(createdMovement.type).toBe('IN')
     expect(createdMovement.quantity).toBe(3)
     expect(createdMovement.productId).toBe('prod-123')

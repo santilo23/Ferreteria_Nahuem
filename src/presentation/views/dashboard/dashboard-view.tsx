@@ -61,9 +61,9 @@ export function DashboardView({
 }: DashboardViewProps) {
   const today = useMemo(() => new Date(), [])
 
-  // Today's metrics
+  // Today's metrics (excluding cancelled receipts)
   const todayReceipts = useMemo(() => {
-    return receipts.filter((r) => isSameDay(new Date(r.date), today))
+    return receipts.filter((r) => isSameDay(new Date(r.date), today) && r.status !== 'CANCELLED')
   }, [receipts, today])
 
   const todaySalesTotal = useMemo(() => {
