@@ -102,25 +102,32 @@ export function DashboardView({
   return (
     <div className="space-y-6">
       {/* Welcome Banner & Quick Action Buttons */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
-              <Sparkles className="h-3 w-3 mr-1 text-blue-400" /> Sistema Local Operativo
-            </span>
-            <span className="text-xs text-slate-400">
-              {today.toLocaleDateString('es-AR', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </span>
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white rounded-2xl p-6 shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <img
+            src="/logo.jpg"
+            alt="Ferretería Nahuem"
+            className="h-14 w-auto object-contain rounded-lg border border-slate-800 shadow-sm bg-black p-0.5"
+          />
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                <Sparkles className="h-3 w-3 mr-1 text-blue-400" /> Sistema Local Operativo
+              </span>
+              <span className="text-xs text-slate-400">
+                {today.toLocaleDateString('es-AR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-white">Panel Principal &bull; Ferretería Nahuem</h2>
+            <p className="text-sm text-slate-300 max-w-xl">
+              Control integral del mostrador, seguimiento de ventas del día y alertas de reposición.
+            </p>
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">Panel Principal</h2>
-          <p className="text-sm text-slate-300 max-w-xl">
-            Control integral del mostrador, seguimiento de ventas del día y alertas tempranas de reposición.
-          </p>
         </div>
 
         {/* Fast Action Tiles */}

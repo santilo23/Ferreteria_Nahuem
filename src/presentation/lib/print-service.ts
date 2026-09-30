@@ -41,6 +41,14 @@ export class PrintService {
               padding: 4px;
               width: 72mm;
             }
+            img {
+              max-width: 60mm;
+              max-height: 25mm;
+              height: auto;
+              display: block;
+              margin: 0 auto 6px auto;
+              object-fit: contain;
+            }
             * {
               box-sizing: border-box;
             }
@@ -53,18 +61,46 @@ export class PrintService {
     `)
     doc.close()
 
-    try {
-      iframe.contentWindow?.focus()
-      setTimeout(() => {
+    const triggerPrint = () => {
+      try {
+        iframe.contentWindow?.focus()
         iframe.contentWindow?.print()
         setTimeout(() => {
           if (iframe.parentNode) {
             document.body.removeChild(iframe)
           }
         }, 1500)
-      }, 250)
+      } catch {
+        window.print()
+      }
+    }
+
+    try {
+      const images = doc.images
+      if (images && images.length > 0) {
+        let pending = images.length
+        const onDone = () => {
+          pending--
+          if (pending <= 0) {
+            setTimeout(triggerPrint, 150)
+          }
+        }
+        for (let i = 0; i < images.length; i++) {
+          if (images[i].complete) {
+            pending--
+          } else {
+            images[i].onload = onDone
+            images[i].onerror = onDone
+          }
+        }
+        if (pending <= 0) {
+          setTimeout(triggerPrint, 250)
+        }
+      } else {
+        setTimeout(triggerPrint, 250)
+      }
     } catch {
-      window.print()
+      setTimeout(triggerPrint, 250)
     }
   }
 

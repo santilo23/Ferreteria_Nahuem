@@ -65,6 +65,11 @@ export function ReceiptDialog({ saleResult, products, open, onClose }: ReceiptDi
         {/* Printable Ticket Card (80mm / 58mm style) */}
         <div id="printable-receipt" className="bg-slate-50 border border-slate-200 rounded-lg p-5 my-2 print:border-none print:bg-white print:p-0">
           <div className="text-center pb-3 border-b border-dashed border-slate-300">
+            <img
+              src="/logo.jpg"
+              alt="Ferretería Nahuem"
+              className="h-10 mx-auto mb-2 object-contain rounded"
+            />
             <h4 className="font-bold text-base tracking-wider uppercase text-slate-900">Ferretería Nahuem</h4>
             <p className="text-xs text-slate-500 font-mono">Control de Stock y Venta Local</p>
             <p className="text-xs text-slate-400 font-mono">Tel: (011) 4455-6677</p>
